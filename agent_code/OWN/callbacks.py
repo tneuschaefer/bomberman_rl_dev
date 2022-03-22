@@ -1,16 +1,28 @@
 from distutils import dist
 import enum
+from json import load
 import os
 import pickle
 from pydoc import cram
 import random
 from re import A
+import weakref
 
 import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
+from random import shuffle
+from scipy.spatial import distance
+from scipy.spatial.distance import cityblock
+
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
+# a list of active bombs to keep track of bombs that have exploded and are dangerous for one more time step
+active_bomb_list = []
+
+# 2-test-q-initialization.csv
+q_table_path = "q_table-task2-test--1-potential-fct.csv"
+# "q_table-task2.csv"
+model_path = "my-saved-model.pt"
+analytics_path = "analytics/"
 
 
 def setup(self):
@@ -31,24 +43,19 @@ def setup(self):
         self.logger.info("Setting up model from scratch.")
         weights = np.random.rand(len(ACTIONS))
         self.model = weights / weights.sum()
-        # ANGELINA
-        self.q_table = []
-
-        if os.path.isfile("q_table.csv"):
-            with open("q_table.csv", "rb") as file:
-                self.q_table = pickle.load(file)
-
-        print("open q- table: size", len(self.q_table))
+        self.q_table = load_file(q_table_path, "rb")
 
     else:
         self.logger.info("Loading model from saved state.")
-        with open("my-saved-model.pt", "rb") as file:
-            self.model = pickle.load(file)
-            # ANGELINA
+        self.model = load_file(model_path, "rb")
+        self.q_table = load_file(q_table_path, "rb")
 
-        if os.path.isfile("q_table.csv"):
-            with open("q_table.csv", "rb") as file:
-                self.q_table = pickle.load(file)
+
+def load_file(path: str, mode: str):
+    if os.path.isfile(path):
+        with open(path, mode) as file:
+            return pickle.load(file)
+    return []
 
 
 def act(self, game_state: dict) -> str:
@@ -71,31 +78,52 @@ def act(self, game_state: dict) -> str:
     # return np.random.choice(ACTIONS, p=self.model)
 
     if self.train and random.uniform(0, 1) < self.epsilon:
-        action = np.random.choice(ACTIONS, p=[.25, .25, .25, .25, 0, 0])
-        #print("Random action with epsilon")
+        current_state = state_to_features(game_state)
 
+        if current_state in self.q_table and 0 in self.q_table[current_state]:
+            # choose action that hasnt been tried out yet
+            action_index = np.where(self.q_table[current_state] == 0)[0][0]
+            action = ACTIONS[action_index]
+            print(
+                f"choose 0 action at state {current_state} action_i {action_index}")
+        else:
+            action = np.random.choice(ACTIONS, p=[.2, .2, .2, .2, .1, .1])
+
+        self.logger.info(
+            f"RANDOM CHOICE at state {state_to_features(game_state)}, action {action}")
     else:
-        #action = np.random.choice(ACTIONS, p=[0, 0, 0, 0, 0, 1])
         action = get_action(self, game_state)
-
-    self.logger.debug(
-        f"at state {state_to_features(game_state)} executed action {action}")
-
     return action
 
 
 def get_action(self, game_state):
     current_state = state_to_features(game_state)
 
-    if current_state in self.q_table:
-        action_index = np.argmax(self.q_table[current_state])
-        action = ACTIONS[action_index]
+    if self.train and current_state not in self.q_table:
+        return np.random.choice(ACTIONS, p=[.2, .2, .2, .2, .1, .1])
 
-    else:
-        action = np.random.choice(ACTIONS, p=[.25, .25, .25, .25, 0, 0])
-        print("state not in q:", current_state)
+    if not self.train and current_state not in self.q_table:
+        current_state = get_most_similar_state(self, current_state)
+        self.logger.warning(
+            f"unseen state: {state_to_features(game_state)} ,found most similar state: {current_state}")
 
+    action_index = np.argmax(self.q_table[current_state])
+    action = ACTIONS[action_index]
+
+    self.logger.debug(
+        f"at state {current_state} executed action {action}")
     return action
+
+
+def get_most_similar_state(self, current_state):
+    keys = list(self.q_table.keys())
+    distances = []
+    for key in keys:
+        # for mannhatan distance cityblock(key, current_state, w=[1, 1, 4, 4, 4, 4, 2, 2, 3, 3])
+        distances.append(distance.euclidean(key, current_state, w=[
+                         3, 3, 2, 2, 2, 2, 1, 1, 4, 4]))
+
+    return keys[np.argmin(distances)]
 
 
 def state_to_features(game_state: dict) -> np.array:
@@ -112,57 +140,53 @@ def state_to_features(game_state: dict) -> np.array:
     :param game_state:  A dictionary describing the current game board.
     :return: np.array
     """
-    # # This is the dict before the game begins and after it ends
-    # if game_state is None:
-    #     return None
-
-    # # For example, you could construct several channels of equal shape, ...
-    # channels = []
-    # channels.append(...)
-    # # concatenate them as a feature tensor (they must have the same shape), ...
-    # stacked_channels = np.stack(channels)
-    # # and return them as a vector
-    # return stacked_channels.reshape(-1)
-
     if game_state is None:
         return None
 
-    field = game_state['field']
-    coins = game_state['coins']
     own_x, own_y = game_state['self'][3]
+    field = game_state['field']
     crates_i = np.where(field == 1)
     crates = list(zip(crates_i[0], crates_i[1]))
+    opponents = game_state['others']
+    opponents_coordinates = [xy for (n, s, b, xy) in opponents]
 
-    # check if coins exist
-    if len(coins) > 0:
-        distance = np.zeros((len(coins), 2))
-        for i, (x, y) in enumerate(coins):
-            dist_x = own_x - x
-            dist_y = own_y - y
-            distance[i, 0] = dist_x
-            distance[i, 1] = dist_y
+    # coin
+    field = game_state['field']
+    field = (field == 0)
+    closest_reachable_obj_coordinates = look_for_targets(
+        field, start=game_state['self'][3], targets=game_state['coins'], logger=None)
 
-        assert len(np.sum(distance, axis=1)) == len(coins)
-        dist_closest_coin = distance[np.argmin(np.sum(distance ** 2, axis=1))]
-        assert len(dist_closest_coin) == 2
-    else:
-        dist_closest_coin = [0, 0]
+    #print("reachable coins coordinates: ", closest_reachable_obj_coordinates)
+    # Manhattan distance
+    dist_closest_coin = get_nearest_obj(
+        closest_reachable_obj_coordinates, own_x, own_y)
 
-    # check if crates exist
-    if len(crates) > 0:
-        distance = np.zeros((len(crates), 2))
-        for i, (x, y) in enumerate(crates):
-            dist_x = own_x - x
-            dist_y = own_y - y
-            distance[i, 0] = dist_x
-            distance[i, 1] = dist_y
+    # crate or opponent
+    # Manhattan distance
+    dist_closest_bombable = get_nearest_bombable_object(
+        crates, opponents, own_x, own_y)
 
-        dist_closest_crate = distance[np.argmin(np.sum(distance ** 2, axis=1))]
-        assert len(dist_closest_crate) == 2
-    else:
-        dist_closest_crate = [0, 0]
+    # bomb
+    # Manhattan distance
+    dist_closest_bomb = get_nearest_bomb(game_state['bombs'], own_x, own_y)
 
-    # check if bomb is close
+    # environment to move
+    # Manhattan distance
+    environment = get_environment(
+        field, opponents_coordinates, game_state['bombs'], own_x, own_y)
+
+    features = np.concatenate(
+        (dist_closest_coin, environment, dist_closest_bombable, dist_closest_bomb))
+
+    return tuple(features)
+
+
+def get_environment(field, opponents, bombs, own_x, own_y):
+    for x, y in opponents:
+        field[x, y] = -1
+
+    for (x, y), t in bombs:
+        field[x, y] = -1
 
     environment = np.zeros(4)
     if field[own_x - 1, own_y] == 0:
@@ -174,6 +198,121 @@ def state_to_features(game_state: dict) -> np.array:
     if field[own_x, own_y + 1] == 0:
         environment[3] = 1
 
-    features = np.append(dist_closest_coin, environment)
+    return environment
 
-    return tuple(features)
+
+def get_nearest_obj(objects: list, own_x, own_y):
+    if len(objects) > 0:
+        distance = np.zeros((len(objects), 2))
+        for i, (x, y) in enumerate(objects):
+            dist_x = own_x - x
+            dist_y = own_y - y
+            distance[i, 0] = dist_x
+            distance[i, 1] = dist_y
+
+        assert len(np.sum(distance, axis=1)) == len(objects)
+        dist_closest_obj = distance[np.argmin(np.sum(distance ** 2, axis=1))]
+        assert len(dist_closest_obj) == 2
+    else:
+        dist_closest_obj = np.array([0, 0])
+
+    return dist_closest_obj
+
+
+def get_nearest_bombable_object(crates: list, opponents: list, own_x, own_y):
+    # use crates if crates still exist
+    dist_closest_bombable = get_nearest_obj(crates, own_x, own_y)
+
+    # if no crates exist use distance to nearest opponent
+    if np.all(dist_closest_bombable == 0):
+        opponents_coordinates = [xy for (n, s, b, xy) in opponents]
+        dist_closest_bombable = get_nearest_obj(
+            opponents_coordinates, own_x, own_y)
+
+    return dist_closest_bombable
+
+
+def get_nearest_bomb(bombs: list, own_x, own_y):
+    """AI is creating summary for get_nearest_bomb
+
+    Args:
+        bombs (list): [description]
+        own_x ([type]): [description]
+        own_y ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
+    bomb_coordinates = bombs
+    # return bomb coordinates if bombs exists
+    if len(bombs) != 0:
+        bomb_coordinates = [xy for (xy, t) in bombs]
+
+    # standard case
+    dist_nearest_bomb = get_nearest_obj(bomb_coordinates, own_x, own_y)
+
+    # special case when agent is on bomb
+    if len(bombs) > 0 and np.all(dist_nearest_bomb == 0):
+        # add bomb twice to capture it in old and new state
+        active_bomb_list.append(bombs)
+        active_bomb_list.append(bombs)
+        dist_nearest_bomb = [100, 100]
+
+    # special case when bomb exploded and is dangerous for one more step, but not present in game_state
+    if len(bombs) == 0 and len(active_bomb_list) != 0:
+        bomb = [xy for (xy, t) in active_bomb_list.pop()]
+        dist_nearest_bomb = get_nearest_obj(bomb, own_x, own_y)
+
+    return dist_nearest_bomb
+
+
+# BREATH FIRST SEARCH
+
+def look_for_targets(free_space, start, targets, logger):
+    """Find direction of closest target that can be reached via free tiles.
+
+    Performs a breadth-first search of the reachable free tiles until a target is encountered.
+    If no target can be reached, the path that takes the agent closest to any target is chosen.
+
+    Args:
+        free_space: Boolean numpy array. True for free tiles and False for obstacles.
+        start: the coordinate from which to begin the search.
+        targets: list or array holding the coordinates of all target tiles.
+        logger: optional logger object for debugging.
+    Returns:
+        coordinate of the closest reachable target
+    """
+    if len(targets) == 0:
+        return []
+
+    frontier = [start]
+    parent_dict = {start: start}
+    dist_so_far = {start: 0}
+    best = start
+    best_dist = np.sum(np.abs(np.subtract(targets, start)), axis=1).min()
+
+    while len(frontier) > 0:
+        current = frontier.pop(0)
+        # Find distance from current position to all targets, track closest
+        d = np.sum(np.abs(np.subtract(targets, current)), axis=1).min()
+        if d + dist_so_far[current] <= best_dist:
+            best = current
+            best_dist = d + dist_so_far[current]
+        if d == 0:
+            # Found path to a target's exact position, mission accomplished!
+            best = current
+            break
+        # Add unexplored free neighboring tiles to the queue in a random order
+        x, y = current
+        neighbors = [(x, y) for (x, y) in [(x + 1, y), (x - 1, y),
+                                           (x, y + 1), (x, y - 1)] if free_space[x, y]]
+        shuffle(neighbors)
+        for neighbor in neighbors:
+            if neighbor not in parent_dict:
+                frontier.append(neighbor)
+                parent_dict[neighbor] = current
+                dist_so_far[neighbor] = dist_so_far[current] + 1
+
+    #logger.warning(f'Suitable target found at {best}')
+
+    return [best]
