@@ -1,0 +1,212 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% University/School Laboratory Report
+% LaTeX Template
+% Version 4.0 (March 21, 2022)
+%
+% This template originates from:
+% https://www.LaTeXTemplates.com
+%
+% Authors:
+% Vel (vel@latextemplates.com)
+% Linux and Unix Users Group at Virginia Tech Wiki
+%
+% License:
+% CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass[
+	letterpaper, % Paper size, specify a4paper (A4) or letterpaper (US letter)
+	10pt, % Default font size, specify 10pt, 11pt or 12pt
+]{CSUniSchoolLabReport}
+
+\addbibresource{references.bib} % Bibliography file (located in the same folder as the template)
+
+%----------------------------------------------------------------------------------------
+%	REPORT INFORMATION
+%----------------------------------------------------------------------------------------
+
+\title{\textbf{Reinforcement Learning for Bomberman \\ Final Project}} % Report title
+
+\author{Angelina Basova \\ Tobias Neuschäfer \\Sven Zelch} % Author name(s), add additional authors like: '\& James \textsc{Smith}'
+
+\date{\today} % Date of the report
+
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+\maketitle % Insert the title, author and date using the information specified above
+
+\begin{center}
+	\begin{tabular}{l r}
+		Tutor:      & TODO                     \\
+		Instructor: & \textsc{Ullrich K\"othe} % Instructor/supervisor
+	\end{tabular}
+\end{center}
+
+
+
+\newpage
+
+\tableofcontents
+\newpage
+
+\listoffigures
+\listoftables
+\newpage
+
+% If you need to include an abstract, uncomment the lines below
+%\begin{abstract}
+%	Abstract text
+%\end{abstract}
+
+%----------------------------------------------------------------------------------------
+%	INTRODUCTION
+%----------------------------------------------------------------------------------------
+
+\section{Introduction}
+
+%----------------------------------------------------------------------------------------
+%	METHODS
+%----------------------------------------------------------------------------------------
+
+\section{Methods}
+
+\subsection{Q-Learning}
+\subsection{Reward Shaping}
+
+%----------------------------------------------------------------------------------------
+%	TRAINING
+%----------------------------------------------------------------------------------------
+
+\section{Training}
+\subsection{Q-Learning}
+
+\subsubsection*{Q Table}
+A major challenge to implement Q-Learning was the creation of a feature space.
+We initialize the Q table as a dictionary, whose keys are the features and the values are the values of the Q function for the six
+actions.
+Choosing a dictionary as the preferred data structure for the Q table provided us
+two major benefits.
+First, we we were able to increase its size and thus its feature space flexibly.
+This proved to be quite helpful to derive training strategies because we
+could focus on the q values of almost the same states.
+Additionally, we didn't feel the need to create a Q table covering every possible
+feature space as for unseen states, we picked actions from a similar seen state.
+
+\subsubsection*{Feature space}
+Our features consist of ten values. The majority of the values contain the Manhattan distance between
+the agent and the nearest object of interest. For instance, Figure \ref{fig:example} illustrates a possible feature.
+The feature shows that the agent is only one cell away from a coin in the x-axis as the first value equals to one.
+The y value equals to 0, which means that the agent is in the same row as the coin.
+
+
+\begin{center}
+	\begin{figure}[H]
+		\begin{tabular}{ccccccccccc}
+			          &                                                        &         &       &        &       &                                                         & \multicolumn{2}{c}{\includegraphics[width=1cm]{Figures/robot_pink.png}} &                              \\
+			          & \multicolumn{2}{c}{\includegraphics{Figures/coin.png}} &         &       &        &       & \multicolumn{2}{c}{\includegraphics{Figures/crate.png}} & \multicolumn{2}{c}{\includegraphics{Figures/bomb_blue.png}}                                            \\
+			\\
+			feature = & (coin x,                                               & coin y, & left, & right, & down, & up,                                                     & crate x ,                                                               & crate y, & bomb x, & bomb y)
+		\end{tabular}
+		\caption{Illustration of the feature structure encoding the space of the agent}
+	\end{figure}
+\end{center}
+
+
+\begin{center}
+	\begin{figure}[h]
+		\centering
+		\begin{tabular}{ccccccccccc}
+			feature = & (1, & 0, & 0, & 0, & 1, & 1, & 5, & 1, & 9, & 12)
+		\end{tabular}
+		\caption{Example of a feature }
+		\label{fig:example}
+	\end{figure}
+\end{center}
+
+
+
+\subsubsection*{Auxilliary Rewards}
+In order to incentivize the agent to perform beneficial actions we used a number of auxilliary rewards.
+The rewards were split into five different categories, which indicate in which case the auxilliary reward
+is earned. For instance, the auxilliary reward MOVED\_IN\_CYCLE corresponds to the general category. This
+means that the reward can be earned at any step in the game. While the auxilliary reward MOVED\_TO\_CRATE can
+only be earned when a crate or an opponent is present in the features, thus its category is Crates, Opponents.
+
+\begin{table}[h]
+	\begin{center}
+		\begin{tabular}{lll}
+			Category & Auxilliary Rewards       & Value \\
+			\hline \hline
+			\multirow{4}*{General}
+			         & e.VALID\_ACTION          &       \\
+			         & NOT\_VALID\_ACTION       &       \\
+			         & MOVED\_IN\_CYCLE         & on    \\
+			         & NOT\_MOVED\_IN\_CYCLE    & on    \\
+			\hline
+			\multirow{4}*{Coins}
+			         & e.COIN\_COLLECTED        &       \\
+			         & e.COIN\_FOUND            &       \\
+			         & MOVED\_TO\_COIN          & on    \\
+			         & MOVED\_AWAY\_FROM\_COIN  & on    \\
+			\hline
+			\multirow{3}*{Crates, Opponents}
+			         & e.DIDNT\_DROP\_BOMB      &       \\
+			         & MOVED\_TO\_CRATE         & on    \\
+			         & MOVED\_AWAY\_FROM\_CRATE & on    \\
+			\hline
+			\multirow{6}*{Bombs}
+			         & MOVED\_TO\_BOMB          & on    \\
+			         & MOVED\_AWAY\_FROM\_BOMB  & on    \\
+			         & MEANINGFUL\_WAIT         &       \\
+			         & NOT\_MEANINGFUL\_WAIT    &       \\
+			         & SAFE\_FROM\_BOMB         &       \\
+			         & NOT\_SAFE\_FROM\_BOMB    &       \\
+			\hline
+			\multirow{3}*{Life}
+			         & e.KILLED\_SELF           &       \\
+			         & NOT\_KILLED\_SELF        &       \\
+			         & e.KILLED\_OPPONENT       &       \\
+			         & e.OPPONENT\_ELIMINATES   &       \\
+			         & e.GOT\_KILLED            &       \\
+			         & e.SURVIVER\_ROUND        &       \\
+			\hline
+		\end{tabular}
+		\caption{Auxilliary rewards and their values}
+		\label{tab:rewards}
+	\end{center}
+\end{table}
+
+
+
+
+%----------------------------------------------------------------------------------------
+%	EXPERIMENTS
+%----------------------------------------------------------------------------------------
+
+\section{Experiments and Results }
+
+
+%----------------------------------------------------------------------------------------
+%	CONCLUSION
+%----------------------------------------------------------------------------------------
+
+\section{Conclusions}
+
+
+
+
+%----------------------------------------------------------------------------------------
+%	BIBLIOGRAPHY
+%----------------------------------------------------------------------------------------
+
+\printbibliography % Output the bibliography
+
+%----------------------------------------------------------------------------------------
+
+\end{document}
