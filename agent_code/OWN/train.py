@@ -9,7 +9,7 @@ import numpy as np
 from pandas import DataFrame
 import random
 import events as e
-from .callbacks import state_to_features, load_file, q_table_path, model_path, analytics_path
+from .callbacks import state_to_features, q_table_path, model_path, analytics_path, active_bomb_list
 from scipy.spatial.distance import cityblock
 
 
@@ -71,7 +71,7 @@ def setup_training(self):
     # ANGELINA
     self.alpha = 0.8
     self.gamma = 0.9
-    self.epsilon = 1
+    self.epsilon = 0.5479999999999997
 
     if not os.path.isfile(q_table_path):
         self.q_table = {}
@@ -111,9 +111,12 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
 
 def update_q_table(self, new_game_state, self_action, old_game_state, events, step):
-    old_state, new_state = get_states(new_game_state, old_game_state)
+    old_state, new_state = get_states(self, new_game_state, old_game_state)
     all_events = add_auxilliary_rewards(self, old_state, new_state, events)
     rewards = reward_from_events(self, all_events)
+
+    self.logger.info(
+        f"moving from {old_state} to {new_state}")
 
     # decay rewards by timestep
     # rewards = (0.99 * np.exp(-0.01 * new_game_state['step'])) * rewards
@@ -125,6 +128,11 @@ def update_q_table(self, new_game_state, self_action, old_game_state, events, st
 
     new_q_value = get_new_q_value(self)
     self.q_table[old_state][ACTION_ROW_MAP[self_action]] = new_q_value
+
+    self.logger.info(
+        f"New q-value is {new_q_value} at state {old_state} for action {ACTION_ROW_MAP[self_action]}")
+
+    self.logger.info("")
 
 
 def potential_fct(new_state, old_state, step, self):
@@ -172,11 +180,12 @@ def fi_reward_shaping(state, step):
     return Fi
 
 
-def get_states(new_game_state, old_game_state):
+def get_states(self, new_game_state, old_game_state):
     new_state = state_to_features(new_game_state)
 
     if old_game_state is None:
         old_state = new_state
+        self.logger.warn("old state NONE")
     else:
         old_state = state_to_features(old_game_state)
 
@@ -220,20 +229,22 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
     :param self: The same object that is passed to all of your callbacks.
     """
-    self.logger.debug(
-        f'Encountered event(s) {", ".join(map(repr, events))} in final step')
 
     # Store the model
     update_q_table(self, last_game_state, last_action,
                    last_game_state, events, last_game_state['step'])
+    # delete old bomb data
+    active_bomb_list[:] = []
+
+    self.logger.debug(
+        f'Encountered event(s) {", ".join(map(repr, events))} in final step')
 
     dump_file(model_path, "wb", self.model)
     dump_file(q_table_path, "wb", self.q_table)
 
     score = last_game_state['self'][1]
-    name = "scores" + q_table_path
+    name = "scores/" + q_table_path.replace("csv", "txt")
     dump_analytics(name, score)
-    # other_score = last_game_state['others'][1]
 
 
 def dump_file(path: str, mode: str, object):
@@ -353,7 +364,7 @@ def add_bomb_rewards(old_state, new_state, events):
 
             if new_distance_bomb != 200:
                 events.append(MOVED_AWAY_FROM_BOMB)
-                events.append(NOT_SAFE_FROM_BOMB)
+                # events.append(NOT_SAFE_FROM_BOMB)
 
             # agent was standing on bomb + is still standing
             if new_distance_bomb == 200:
@@ -399,41 +410,40 @@ def reward_from_events(self, events: List[str]) -> int:
     """
     game_rewards = {
         # GENERAL
-        VALID_ACTION: 100,
-        e.INVALID_ACTION: -100,
-        MOVED_IN_CYCLE: -30,
-        NOT_MOVED_IN_CYCLE: 5,
+        VALID_ACTION: 0,
+        e.INVALID_ACTION: -2000,
+        MOVED_IN_CYCLE: -2000,
+        NOT_MOVED_IN_CYCLE: 0,
 
         # COINS
-        MOVED_TO_COIN: 5,
+        MOVED_TO_COIN: 50,
         MOVED_AWAY_FROM_COIN: -5,
-        e.COIN_COLLECTED: 50,
+        e.COIN_COLLECTED: 1000,
         e.COIN_FOUND: 20,
 
         # CRATES
-        e.CRATE_DESTROYED: 20,
-        e.SURVIVED_ROUND: 30,
-        DIDNT_DROP_BOMB: -10,
-        MOVED_TO_CRATE: 10,
-        MOVED_AWAY_FROM_CRATE: -10,
+        e.CRATE_DESTROYED: 50,
+        DIDNT_DROP_BOMB: -60,
+        MOVED_TO_CRATE: 100,
+        MOVED_AWAY_FROM_CRATE: -50,
 
         # BOMBS
-        MOVED_TO_BOMB: -50,
-        MOVED_AWAY_FROM_BOMB: 50,
+        MOVED_TO_BOMB: -2000,
+        MOVED_AWAY_FROM_BOMB: 200,
         MEANINGFUL_WAIT: 5,
-        NOT_MEANINGFUL_WAIT: -5,
-        SAFE_FROM_BOMB: 100,
-        NOT_SAFE_FROM_BOMB: -100,
-        MEANINGFUL_BOMB_DROP: 70,
-        NOT_MEANINGFUL_BOMB_DROP: -80,
-
+        NOT_MEANINGFUL_WAIT: -30,
+        SAFE_FROM_BOMB: 200,
+        NOT_SAFE_FROM_BOMB: -200,
+        MEANINGFUL_BOMB_DROP: 200,
+        NOT_MEANINGFUL_BOMB_DROP: -400,
 
         # LIFE
-        e.KILLED_SELF: -100,
-        NOT_KILLED_SELF: 100,
-        e.KILLED_OPPONENT: 50,
+        e.KILLED_SELF: -2000,
+        NOT_KILLED_SELF: 0,
+        e.KILLED_OPPONENT: 1000,
         e.OPPONENT_ELIMINATED: 50,
-        e.GOT_KILLED: -100,
+        e.GOT_KILLED: -2000,
+        e.SURVIVED_ROUND: 0,
     }
     # remove duplicate events
     events = list(set(events))

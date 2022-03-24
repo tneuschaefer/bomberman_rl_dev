@@ -19,9 +19,9 @@ ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 active_bomb_list = []
 
 # 2-test-q-initialization.csv
-q_table_path = "q_table-task2-test--1-potential-fct.csv"
+q_table_path = "data/q_table-task2-PaperRewards.csv"
 # "q_table-task2.csv"
-model_path = "my-saved-model.pt"
+model_path = "data/my-saved-model.pt"
 analytics_path = "analytics/"
 
 
@@ -84,15 +84,18 @@ def act(self, game_state: dict) -> str:
             # choose action that hasnt been tried out yet
             action_index = np.where(self.q_table[current_state] == 0)[0][0]
             action = ACTIONS[action_index]
-            print(
-                f"choose 0 action at state {current_state} action_i {action_index}")
+            #print(f"choose 0 action at state {current_state} action_i {action_index}, also action = {action}")
         else:
             action = np.random.choice(ACTIONS, p=[.2, .2, .2, .2, .1, .1])
 
+        self.logger.info(f"Agent standing on {game_state['self'][3]}")
+        self.logger.info(f"Bombs standing on {game_state['bombs']}")
         self.logger.info(
             f"RANDOM CHOICE at state {state_to_features(game_state)}, action {action}")
     else:
         action = get_action(self, game_state)
+
+    first_move = False
     return action
 
 
@@ -262,6 +265,8 @@ def get_nearest_bomb(bombs: list, own_x, own_y):
     if len(bombs) == 0 and len(active_bomb_list) != 0:
         bomb = [xy for (xy, t) in active_bomb_list.pop()]
         dist_nearest_bomb = get_nearest_obj(bomb, own_x, own_y)
+        # delete old bomb data
+        #active_bomb_list[:] = []
 
     return dist_nearest_bomb
 
