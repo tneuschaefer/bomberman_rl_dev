@@ -88,7 +88,7 @@ def all_actions_explored(file: str):
 
 def multi_process(game: int):
     os.system(
-        "python main.py play --no-gui --agents OWN --train 1 --scenario coin-heaven --n-rounds 1000")
+        "python main.py play --no-gui --agents OWN rule_based_agent rule_based_agent rule_based_agent --train 1 --scenario classic --n-rounds 1000")
     # remove seed when training complete
 
 
