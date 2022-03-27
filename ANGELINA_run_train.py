@@ -1,4 +1,6 @@
+from doctest import script_from_examples
 import os
+import re
 import agent_code.OWN.train as train
 import time
 import pickle
@@ -40,7 +42,9 @@ def get_q_name():
     [type]
         [description]
     """
-    path = "/Users/angelinabasova/Library/CloudStorage/OneDrive-bwedu/bomberman_rl_dev/agent_code/OWN/callbacks.py"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    rel_path = "agent_code/OWN/callbacks.py"
+    path = os.path.join(script_dir, rel_path)
 
     with open(path) as f:
         lines = f.readlines()
@@ -70,8 +74,11 @@ def all_actions_explored(file: str):
     [type]
         [description]
     """
-    path = "/Users/angelinabasova/Library/CloudStorage/OneDrive-bwedu/bomberman_rl_dev/agent_code/OWN/" + file
-    path = path.replace("\"", "")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    rel_path = "agent_code/OWN/" + file
+    rel_path = rel_path.replace("\"", "")
+    path = os.path.join(script_dir, rel_path)
+    
     with open(path, "rb") as file:
         q_table = pickle.load(file)
     val = list(q_table.values())
@@ -93,7 +100,9 @@ def write_to_file(epsilon):
     epsilon : [type]
         [description]
     """
-    path = "/Users/angelinabasova/Library/CloudStorage/OneDrive-bwedu/bomberman_rl_dev/agent_code/OWN/train.py"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    rel_path = "agent_code/OWN/train.py"
+    path = os.path.join(script_dir, rel_path)
 
     with open(path) as f:
         lines = f.readlines()
@@ -118,8 +127,11 @@ def print_q_table_info(file: str):
     file : str
         [description]
     """
-    path = "/Users/angelinabasova/Library/CloudStorage/OneDrive-bwedu/bomberman_rl_dev/agent_code/OWN/" + file
-    path = path.replace("\"", "")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    rel_path = "agent_code/OWN/" + file
+    rel_path = rel_path.replace("\"", "")
+    path = os.path.join(script_dir, rel_path)
+    
     with open(path, "rb") as file:
         q_table = pickle.load(file)
     print(f"Q-table has {len(q_table)} states")
