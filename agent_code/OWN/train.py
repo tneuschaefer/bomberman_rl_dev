@@ -71,7 +71,7 @@ def setup_training(self):
     # ANGELINA
     self.alpha = 0.8
     self.gamma = 0.9
-    self.epsilon = 0.494
+    self.epsilon = 0.492
     if not os.path.isfile(q_table_path):
         self.q_table = {}
 
