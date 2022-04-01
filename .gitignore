@@ -113,3 +113,11 @@ replays/
 results/
 agent_code/.DS_Store
 .DS_Store
+*.aux
+*.bcf
+*.lof
+*.lot
+*.out
+*.xml
+*.gz
+*.toc

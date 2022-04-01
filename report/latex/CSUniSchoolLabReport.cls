@@ -32,6 +32,7 @@
 
 \usepackage{amsmath} % Required for some math elements 
 \usepackage{multirow}
+\usepackage{hyperref}
 
 	
 \usepackage{color, colortbl}

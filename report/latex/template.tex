@@ -108,10 +108,10 @@ The y value equals to 0, which means that the agent is in the same row as the co
 \begin{center}
 	\begin{figure}[H]
 		\begin{tabular}{ccccccccccc}
-			          &                                                        &         &       &        &       &                                                         & \multicolumn{2}{c}{\includegraphics[width=1cm]{Figures/robot_pink.png}} &                              \\
-			          & \multicolumn{2}{c}{\includegraphics{Figures/coin.png}} &         &       &        &       & \multicolumn{2}{c}{\includegraphics{Figures/crate.png}} & \multicolumn{2}{c}{\includegraphics{Figures/bomb_blue.png}}                                            \\
+			          &                                                               &                           & \multicolumn{1}{c}{\includegraphics[width=1cm]{Figures/robot_pink.png}}          &                                                             \\
+			          & \multicolumn{1}{c}{\includegraphics{Figures/coin.png}}        &                           & \multicolumn{1}{c}{\includegraphics{Figures/crate.png}}                          & \multicolumn{1}{c}{\includegraphics{Figures/bomb_blue.png}} \\
 			\\
-			feature = & (coin x,                                               & coin y, & left, & right, & down, & up,                                                     & crate x ,                                                               & crate y, & bomb x, & bomb y)
+			feature = & (coin x,                                              coin y, & left,  right,  down,  up, & crate x ,                                                               crate y, & bomb x,  bomb y)
 		\end{tabular}
 		\caption{Illustration of the feature structure encoding the space of the agent}
 	\end{figure}
@@ -140,41 +140,43 @@ only be earned when a crate or an opponent is present in the features, thus its 
 
 \begin{table}[h]
 	\begin{center}
-		\begin{tabular}{lll}
-			Category & Auxilliary Rewards       & Value \\
+		\begin{tabular}{llc}
+			Category & Auxilliary Rewards          & Value \\
 			\hline \hline
 			\multirow{4}*{General}
-			         & e.VALID\_ACTION          &       \\
-			         & NOT\_VALID\_ACTION       &       \\
-			         & MOVED\_IN\_CYCLE         & on    \\
-			         & NOT\_MOVED\_IN\_CYCLE    & on    \\
+			         & e.VALID\_ACTION             & 0     \\
+			         & NOT\_VALID\_ACTION          & -2000 \\
+			         & MOVED\_IN\_CYCLE            & -2000 \\
+			         & NOT\_MOVED\_IN\_CYCLE       & 0     \\
 			\hline
 			\multirow{4}*{Coins}
-			         & e.COIN\_COLLECTED        &       \\
-			         & e.COIN\_FOUND            &       \\
-			         & MOVED\_TO\_COIN          & on    \\
-			         & MOVED\_AWAY\_FROM\_COIN  & on    \\
+			         & e.COIN\_COLLECTED           & 1000  \\
+			         & e.COIN\_FOUND               & 20    \\
+			         & MOVED\_TO\_COIN             & 50    \\
+			         & MOVED\_AWAY\_FROM\_COIN     & -5    \\
 			\hline
 			\multirow{3}*{Crates, Opponents}
-			         & e.DIDNT\_DROP\_BOMB      &       \\
-			         & MOVED\_TO\_CRATE         & on    \\
-			         & MOVED\_AWAY\_FROM\_CRATE & on    \\
+			         & e.DIDNT\_DROP\_BOMB         & -60   \\
+			         & MOVED\_TO\_CRATE            & 100   \\
+			         & MOVED\_AWAY\_FROM\_CRATE    & -50   \\
 			\hline
-			\multirow{6}*{Bombs}
-			         & MOVED\_TO\_BOMB          & on    \\
-			         & MOVED\_AWAY\_FROM\_BOMB  & on    \\
-			         & MEANINGFUL\_WAIT         &       \\
-			         & NOT\_MEANINGFUL\_WAIT    &       \\
-			         & SAFE\_FROM\_BOMB         &       \\
-			         & NOT\_SAFE\_FROM\_BOMB    &       \\
+			\multirow{8}*{Bombs}
+			         & MOVED\_TO\_BOMB             & -2000 \\
+			         & MOVED\_AWAY\_FROM\_BOMB     & 200   \\
+			         & MEANINGFUL\_WAIT            & 5     \\
+			         & NOT\_MEANINGFUL\_WAIT       & -30   \\
+			         & SAFE\_FROM\_BOMB            & 200   \\
+			         & NOT\_SAFE\_FROM\_BOMB       & -200  \\
+			         & MEANINGFUL\_BOMB\_DROP      & 200   \\
+			         & NOT\_MEANINGFUL\_BOMB\_DROP & -400  \\
 			\hline
 			\multirow{3}*{Life}
-			         & e.KILLED\_SELF           &       \\
-			         & NOT\_KILLED\_SELF        &       \\
-			         & e.KILLED\_OPPONENT       &       \\
-			         & e.OPPONENT\_ELIMINATES   &       \\
-			         & e.GOT\_KILLED            &       \\
-			         & e.SURVIVER\_ROUND        &       \\
+			         & e.KILLED\_SELF              & -2000 \\
+			         & NOT\_KILLED\_SELF           & 0     \\
+			         & e.KILLED\_OPPONENT          & 1000  \\
+			         & e.OPPONENT\_ELIMINATES      & 50    \\
+			         & e.GOT\_KILLED               & -2000 \\
+			         & e.SURVIVER\_ROUND           & 0     \\
 			\hline
 		\end{tabular}
 		\caption{Auxilliary rewards and their values}
@@ -184,12 +186,112 @@ only be earned when a crate or an opponent is present in the features, thus its 
 
 
 
+\subsubsection{Discussion}
+The agent showed some promising results in specific circumstances. The following points discuss
+some problems and solutions to improve the agent.
+
+\paragraph*{Zero values}
+A major bottleneck in the development of the agent was the lengthy training. The majority of
+the last week before the submission was utilized for training. However, this proved to not be enough as 50\%
+of the actions in the Q table contained a zero value, meaning that the action was never tried out.
+
+\paragraph*{Better choice among zero values}
+Based on the observed training per state, which equals to XX min /per XX rounds or games it wouldn't
+be feasible to train the agent until it converges to a good policy. During training fine-grained
+tasks such as the collection of coins, we observed that the agent showed acceptable performance
+after the Q table passed the threshold of XX non-zero values. This indicates that after XX state-action pairs
+were selected at least one, the Q table converged to a good policy.
+When the threshold is reached, there are XX zero values in the Q table or in other words, XX state-action pairs not
+tried out yet. In certain states, the tried out actions contained negativ Q values. This drove the agent to
+choose one of the not tried out actions, as their value of zero is higher than any negative value.
+In this case, the agent would choose the first zero valued action. An interesting adjustment, would
+be to choose a random action of the zero valued. This would provide two major benefits.
+
+1. As during axploration, we choose the first zero valued action to try, we can see that the
+majority of the first actions have been tried out, while the majority of the last two actions contain the most zero values.
+This drove the agent to choose the last two actions, 'WAIT' and 'BOMB', the majority of the time
+when tried out actions of the current state contained a negative Q value.
+
+\paragraph*{Decision time at unseen states}
+\paragraph*{Similar states}
+A major problem that we oversaw was that the agent needed more time than specified to choose an action.
+This was the case, when the agent was in a state, that wasn't present in the Q table. In out implementation, we
+choose an action from the most similar state present in the Q table. We define state similarity as a weighted euclidean
+distance. Our weight vector $w$ is $ w= (3, 3, 2, 2, 2, 2, 1, 1, 4, 4)$. The weights were
+chosen based on the winning criteria of the game. As the winner is the agent with the highest score,
+we chose the highest weight of 4 for the nearest bomb distance following with a weight of 3 for the nearest coin distance.
+Next, we felt that a similar state should contain the same free tiles as the unseen state, to avoid invalid actions to be chosen.
+Finally, we believe that the distance to a crate or opponent is not crutial for an unseen state as they don't influence the agent't score directly.
+Thus we chose a weight of 1.
+
+\paragraph*{Computation of similar states}
+To compute a similar state we used an efficient function provided by the scipy library. We
+tested the implementation of fine-grained tasks and always determined the best action
+whithin the given time frame. However, the final submitted agent exceeded think time in multiple time steps of every round.
+The reasons is that we iterated over all states of the Q table to compute the euclidean distance between
+the current state. As the Q table increased dramatically in size once we merged the three tables, the iteration took longer than the provided
+think time for the agent. A better approach would be to use another more efficient function provided by scipy
+that handles the iteration internally.
+
+
+
 
 %----------------------------------------------------------------------------------------
 %	EXPERIMENTS
 %----------------------------------------------------------------------------------------
 
-\section{Experiments and Results }
+\section{Experiments and Results}
+
+\subsection{Q-Learning}
+Although our agents spends the majority of the time waiting as it exceeds the
+think time, the bug is easily solved by removing iterations over the states.
+As the bug was easily solved and isn't directly related to Q-Learning, the
+following charts show the agent's performance after solving the bug. By removing the
+minor bug, we illustrate the performance of our Q-Learning implementation.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[scale=0.6]{Figures/metrics.png}
+	\label{img:metrics}
+	\caption{Game Metrics comparison in classic and coin-heaven scenario.}
+\end{figure}
+
+Figure \ref{img:metrics} ????????????????????? shows the game metrics in the classic and the coin-heaven
+scenario.
+
+less steps is coin heaven
+
+higher score by 13x
+
+More time in coin-heaven by over 2.5x
+due to ??
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[scale=0.6]{Figures/game.png}
+	\label{img:game}
+	\caption{Performance comparison in classic and coin-heaven scenario.}
+\end{figure}
+
+Figure \ref{img:game} shows the effect of the moves in the classic and the coin-heaven
+scenario. Over all four labels the classic scenario contains consistently higher values.
+This indicates the worst performance in comparison to the coin-heaven scenario, which
+aligns with our focus on training in the coin-heaven scenario.
+This observation becomes even more obvious when considering bad choices such as invalid actions and suicides
+which are higher.
+
+In the classic scenario, as the agent is less cautious with its moves, its performs on average 24.5 moves per round.
+The ratio is 5x.
+
+Invalid actions ratio over 24x.
+
+Bomb ratio over 6x.
+
+suicides ratio over 2.5x
+
+Overall, the agent shows better performance in the coin-heaven scenarion than in
+the classic scenario. Our focus on the coin-heaven scenario created an agent..
+The performance is consistently better over all criteria except the time.
 
 
 %----------------------------------------------------------------------------------------
