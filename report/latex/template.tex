@@ -107,12 +107,13 @@ The y value equals to 0, which means that the agent is in the same row as the co
 
 \begin{center}
 	\begin{figure}[H]
-		\begin{tabular}{ccccccccccc}
-			          &                                                               &                           & \multicolumn{1}{c}{\includegraphics[width=1cm]{Figures/robot_pink.png}}          &                                                             \\
-			          & \multicolumn{1}{c}{\includegraphics{Figures/coin.png}}        &                           & \multicolumn{1}{c}{\includegraphics{Figures/crate.png}}                          & \multicolumn{1}{c}{\includegraphics{Figures/bomb_blue.png}} \\
-			\\
-			feature = & (coin x,                                              coin y, & left,  right,  down,  up, & crate x ,                                                               crate y, & bomb x,  bomb y)
-		\end{tabular}
+		\scalebox{0.7}{
+			\begin{tabular}{ccccccccccc}
+				          &                                                        &         &       &        &                                                         & \multicolumn{2}{c}{\includegraphics[width=1cm]{Figures/robot_pink.png}} &                              \\
+				          & \multicolumn{2}{c}{\includegraphics{Figures/coin.png}} &         &       &        & \multicolumn{2}{c}{\includegraphics{Figures/crate.png}} & \multicolumn{2}{c}{\includegraphics{Figures/bomb_blue.png}}                                            \\
+				\\
+				feature = & (coin x,                                               & coin y, & left, & right, & down,  up,                                              & crate x ,                                                               & crate y, & bomb x, & bomb y)
+			\end{tabular}}
 		\caption{Illustration of the feature structure encoding the space of the agent}
 	\end{figure}
 \end{center}
@@ -138,8 +139,9 @@ is earned. For instance, the auxilliary reward MOVED\_IN\_CYCLE corresponds to t
 means that the reward can be earned at any step in the game. While the auxilliary reward MOVED\_TO\_CRATE can
 only be earned when a crate or an opponent is present in the features, thus its category is Crates, Opponents.
 
-\begin{table}[h]
-	\begin{center}
+\begin{table}[H]
+	\centering
+	\scalebox{0.8}{
 		\begin{tabular}{llc}
 			Category & Auxilliary Rewards          & Value \\
 			\hline \hline
@@ -178,10 +180,10 @@ only be earned when a crate or an opponent is present in the features, thus its 
 			         & e.GOT\_KILLED               & -2000 \\
 			         & e.SURVIVER\_ROUND           & 0     \\
 			\hline
-		\end{tabular}
-		\caption{Auxilliary rewards and their values}
-		\label{tab:rewards}
-	\end{center}
+		\end{tabular}}
+	\caption{Auxilliary rewards and their values}
+	\label{tab:rewards}
+
 \end{table}
 
 
@@ -221,7 +223,7 @@ distance. Our weight vector $w$ is $ w= (3, 3, 2, 2, 2, 2, 1, 1, 4, 4)$. The wei
 chosen based on the winning criteria of the game. As the winner is the agent with the highest score,
 we chose the highest weight of 4 for the nearest bomb distance following with a weight of 3 for the nearest coin distance.
 Next, we felt that a similar state should contain the same free tiles as the unseen state, to avoid invalid actions to be chosen.
-Finally, we believe that the distance to a crate or opponent is not crutial for an unseen state as they don't influence the agent't score directly.
+Finally, we believe that the distance to a crate or opponent is not crucial for an unseen state as they don't influence the agent't score directly.
 Thus we chose a weight of 1.
 
 \paragraph*{Computation of similar states}
@@ -243,55 +245,80 @@ that handles the iteration internally.
 \section{Experiments and Results}
 
 \subsection{Q-Learning}
-Although our agents spends the majority of the time waiting as it exceeds the
-think time, the bug is easily solved by removing iterations over the states.
-As the bug was easily solved and isn't directly related to Q-Learning, the
-following charts show the agent's performance after solving the bug. By removing the
-minor bug, we illustrate the performance of our Q-Learning implementation.
+The submitted agent exceeds the majority of the think time due to an iteration while searching for
+similar states.
+As the exceeding in think time isn't related to Q-Learning but to the programmatic implementation of a search function,
+we perform the following experiments after replacing the iteration with a scipy function.
+The result of the search function remains the same.
+However, this way we are able to illustrate the performance of our Q-Learning implementation
+considerating the selected hyperparameters and auxilliary rewards.
 
-\begin{figure}[H]
+
+\begin{figure}[h]
 	\centering
 	\includegraphics[scale=0.6]{Figures/metrics.png}
+	\caption{Comparison of game metrics in the classic and coin-heaven scenario. The values
+		correspond to an average value per round after playing for 100 rounds.}
 	\label{img:metrics}
-	\caption{Game Metrics comparison in classic and coin-heaven scenario.}
 \end{figure}
 
-Figure \ref{img:metrics} ????????????????????? shows the game metrics in the classic and the coin-heaven
-scenario.
+Figure \ref{img:metrics} shows the game metrics in the classic and the coin-heaven
+scenario. Each value equals to the average value per round after playing 100 rounds.
 
-less steps is coin heaven
+In the classic scenario, the agent plays on average for 80 steps. In contrast, in the
+coin-heaven scenario the agent plays only for 70 steps. In both scenarios, the
+average round ends way before the 400 steps are achieved. The reason lies at that
+the use of a dynamic reward shaping function in combination with a high $\gamma$ hyperparameter.
+A high $\gamma$ emphasizes future rewards, which incentivizes the agent to collect a high cumulative ?? reward
+over the round. However, the dynamic reward shaping function reduces the reward by the time step,
+to incentivize the agent to finish the round fast. Therefore, the agent is incentivized to end the
+round early to maximize its rewards, which is clearly the case in both scenarios.
 
-higher score by 13x
+In the coin-heaven scenario, the average score equals to 1.6 points which is by 13 times higher.
+While in the classic scenario,
+the agents earns 0.12 points. As the agent was primarily trained in the coin-heaven scenario, the Q values of
+the states of the coin-heaven scenario converged better than the Q values of the classic scenario.
 
-More time in coin-heaven by over 2.5x
-due to ??
+The think time in the coin-heaven scenario is by 2.5 times higher than in the classic scenario.
+The think time at seen states is XX??. For unseen states, the agent searches for the most similar seen state
+in the Q table and chooses its best action. ????
 
-\begin{figure}[H]
+
+\begin{figure}[h]
 	\centering
 	\includegraphics[scale=0.6]{Figures/game.png}
+	\caption{Comparison of performance in the classic and coin-heaven scenario. The values
+		correspond to an average value per round after playing for 100 rounds.}
 	\label{img:game}
-	\caption{Performance comparison in classic and coin-heaven scenario.}
 \end{figure}
 
 Figure \ref{img:game} shows the effect of the moves in the classic and the coin-heaven
-scenario. Over all four labels the classic scenario contains consistently higher values.
+scenario.
+
+
+Over all four metrics the classic scenario contains consistently higher values.
 This indicates the worst performance in comparison to the coin-heaven scenario, which
 aligns with our focus on training in the coin-heaven scenario.
-This observation becomes even more obvious when considering bad choices such as invalid actions and suicides
-which are higher.
+This observation becomes even more obvious when considering bad actions such as invalid actions and suicides.
+In the coin-heaven scenario the agent chooses on average 24 times more invalid actions and performs 2.5 times
+more suicides.
 
 In the classic scenario, as the agent is less cautious with its moves, its performs on average 24.5 moves per round.
-The ratio is 5x.
+The ratio is 5x.???? what are moves
 
-Invalid actions ratio over 24x.
+Surprisingly, the agent places 6 times more bombs in the classic scenario. Despite the shorter training time,
+the beneficial action is selected way more times than in the coin-heaven scenario. Given that there are less
+crates and opponents in the coin-heaven scenario than in the classic scenario, the auxilliary rewards incentivized
+the use of bombs in the classic scenario. While 2.4 bombs are certainly not enough to win the round,
+the bomb ratio between the two scenarios shows that the rewards give the right incentives. The main issue remains
+the long training time until convergence.
 
-Bomb ratio over 6x.
 
-suicides ratio over 2.5x
-
-Overall, the agent shows better performance in the coin-heaven scenarion than in
-the classic scenario. Our focus on the coin-heaven scenario created an agent..
-The performance is consistently better over all criteria except the time.
+Overall, the agent shows better performance in the coin-heaven scenario than in
+the classic scenario. The performance is consistently better over all metrics except the time.
+The longer training time resulted into more Q values closer to convergence. Nevertheless,
+we observe good behavior in both scenarios, such as a low number of invalid actions and more bombs placing in
+the scenario with crates and opponents.
 
 
 %----------------------------------------------------------------------------------------
@@ -301,7 +328,7 @@ The performance is consistently better over all criteria except the time.
 \section{Conclusions}
 
 
-
+\subsection*{Q-Learning}
 
 %----------------------------------------------------------------------------------------
 %	BIBLIOGRAPHY
