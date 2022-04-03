@@ -55,7 +55,47 @@
 
 \section{Introduction}
 
-\subsection{Reinforcement Learning}
+\subsection{Problem definition \tiny Sven Zelch}
+	% the game and goal of the game
+	In this report we are developing an agent for the game Bomberman.
+	In Bomberman four agents compete against each other with the goal to reach the highest score of those four agents and by that winning the game.
+	The game is played in a 17x17 match field where each agents starts in a random corner.
+	The corner an agent starts can not be the same as the corner of another agent.
+	
+	% mention available actions
+	An agent can perform one action each discrete time step.
+	In other words every agent plays at the same speed and can not perform two actions while other agents only perform one.
+	It can chose from six actions. 
+	An agent can either move horizontally (left or right), vertically (up or down), drop a bomb or wait.
+	
+	% the field
+	The match field consists of empty fields, walls, coins, crates and agents.
+	One agent can only walk trough empty fields and coins, but can not walk through walls, creates and other agents.
+	When an agent reaches a coin field the coin gets collected and the agents score increases by 1. 
+	Also the coin field is now an empty field and other agents can not obtain a coin on this field any more. 
+	Another way for the agent to increase his score is by blowing up enemies. 
+	It is rewarded with 5 points and also the another agent is dead and can not collect more coins.
+	Some coins are already visible on the field while others are hidden in crates and have to be found by blowing crates up, which by chance have coins in them.
+	These coins can be collected as described above and also get a score increase by 1.
+	
+	% given time!
+	Something really important about the game is that agents only have 0.5 seconds to chose an action.
+	In case they did not chose an action within the 0.5 seconds the game will always chose the action wait for them.
+	And also the agent will get punished for taking to long to chose an action in the following step.
+	The exceeding time the agent took to chose the action will be subtracted by the 0.5 seconds the agent has to chose an action.
+
+\subsection{Reinforcement Learning \tiny Sven Zelch}
+	Reinforcement Learning is typically used for gaming and that is why it is predestined for our problem.
+	The agent collects data, in our case q-values which we will talk about later, and makes predictions about how good a certain action is given the current state.
+	A speciality of Reinforcement learning is that the agent can change the environment (the match field in our case) by certain actions, e.g. placing a bomb and blowing up a crate.
+	
+	Also feedback in Reinforcement Learning is only given at the end of a game. 
+	Which seems problematic in a game like Bomberman where it takes a lot of steps until a game is finished and we just get the reward according to your placement at the end of the game.
+	We struggled with this a lot, but especially reward shaping help us with speeding up the learning process.
+	Reward shaping means designing rewards for moves that we think are good like moving away from a bomb or moves that are bad like staying in bomb range.
+	We described it as moves we think are good, because they do not need to end up being good.
+	For example placing a bomb near an enemy agent is good, but not if gets into an position where the agent can not run away from the bomb and blows himself up.
+	A more detailed explanation of the reward shaping we did by adding auxiliary rewards can be seen at section \ref{auxRewards}.
 
 \subsection{Q-Learning \AB}
 Q-Learning ist a model-free reinforcement learning.
@@ -73,6 +113,13 @@ optimal policy.
 %----------------------------------------------------------------------------------------
 
 \section{Methods}
+
+\subsection{Q-table size problem \tiny Sven Zelch}
+	
+	At first we set up a q-table with every possible state action pair and came to the conclusion that it is way to big and we will have issues later, e.g. training would take way to long and it is unlikely that the agent will discover every state action pair during training.
+	As a solution to this problem we taught of shrinking the environment in order to get a smaller q-table, which makes not discovering every state action pair less likely, however the q-table was still to big and although it was less likely to have not discovered state actions pairs during training it is still very likely that many of those occur.  
+	Since we came to the conclusion that we would have way to many entries inside the q-table if we would consider all state action pairs even in the smaller environment, we considered using a space-matrix approach.
+	For this approach we did us a dictionary for easier readability, especially for later debugging and reward shaping with auxiliary rewards in mind.
 
 \subsection{Reward Shaping}
 
@@ -150,7 +197,7 @@ The y value equals to 0, which means that the agent is in the same row as the co
 
 
 
-\subsubsection*{Auxilliary Rewards}
+\subsubsection*{Auxilliary Rewards}\label{auxRewards}
 In order to incentivize the agent to perform beneficial actions we used a number of auxilliary rewards.
 The rewards were split into five different categories, which indicate in which case the auxilliary reward
 is earned. For instance, the auxilliary reward MOVED\_IN\_CYCLE corresponds to the general category. This
@@ -204,31 +251,50 @@ only be earned when a crate or an opponent is present in the features, thus its 
 
 \end{table}
 
+\subsubsection{General \tiny Sven Zelch}
+At first we only had the rewards e.VALID\_ACTION and NOT\_VALID\_ACTION and given them the same reward/punishment.
+For example e.VALID\_ACTION = 10 and NOT\_VALID\_ACTION = -10.
+On the one hand we found out that rewarding him to much for a valid action would just result in him doing random valid moves.
+On the other doing an invalid action is really bad for the agent since it results in a lot of waiting, because off the agent trying to run into walls. 
+That is why we reduced the reward for valid actions and increased the punishment for invalid action a lot.
+During this process we also found out, that the agent often gets stuck in loops, e.g. moves up and down 20 times in a row.
+To address this issue we implemented a MOVED\_IN\_CYCLE punishment and a corresponding NOT\_MOVED\_IN\_CYCLE reward.
+If the new state is within the last two states the agent moved in a small cycle.
+With this we only fixed the issue of small cycles like the up and down example, because we only look at the last two steps.
+However large cycles like walking around a one block wall happened very rarely and we did not concern this as an issue.
+
+\subsubsection{Coins \tiny Sven Zelch}
+The two rewards e.COIN\_COLLECTED and e.COIN\_FOUND were already implemented. 
+We first decided to give both a high reward, because finding and collecting coins are crucial to scoring points and by that winning the game.
+After some testing we saw strange behavior from our agent. He blew up crates and found coins, but never seemed to bother picking them up.
+Therefore we designed MOVED\_TO\_COIN, which rewards the agent when it is moving to the nearest coin. 
+We also lowered the reward for finding a coin, because it did not seem to important, because the agent already gets rewarded from blowing up crates and now also moving to the coin if one was hidden under a crate.
+MOVED\_AWAY\_FROM\_COIN was also created since it was easy to implement with MOVED\_TO\_COIN already created, but we found out that punishing the agent to much for moving away from a coin results in the agent paying less attention to bombs by blindly walking to coins.
+
+\subsubsection{Crates, Opponents \tiny Sven Zelch}
+Destroying crates was not important at first, because the agent was playing on the coin-heaven scenario.
+When it was playing alone on the classic scenario it just tried to collect coins and did not blow up crates.
+Which means that quite often the nearest coin was not reachable and the agent was constantly running into a wall.
+To solve this we rewarded the agent for destroying a crate with the e.CRATE\_DESTROYED reward.
+Since this seemed to have no effect, because it took the agent to long to learn it, we also added a DIDNT\_DROP\_BOMB punishment, if the agent is in front of a bomb and does not drop a bomb.
+That still did not show great results so we added the two opposite rewards MOVED\_TO\_CRATE and MOVED\_AWAY\_FROM\_CRATE which finally showed some promising results when it comes to him destroying crates, but he often tends to kill himself.
 
 
-\begin{figure}
-
-	\begin{subfigure}{\textwidth}
-		%\centering
-		\includegraphics[scale=0.6]{Figures/Task2-1.png}
-		\caption{Performance comparison Terminator and coin\_collector\_agent in classic scenario without opponents}
-		\label{img:Task2-1}
-	\end{subfigure}
-
-
-	\begin{subfigure}{\textwidth}
-		%\centering
-		\includegraphics[scale=0.6]{Figures/Task2-2.png}
-		\caption{Performance comparison Terminator and coin\_collector\_agent in classic scenario without opponents}
-		\label{img:Task2-2}
-	\end{subfigure}
-
-	\caption{Performance comparison Terminator and coin\_collector\_agent in classic scenario without opponents}
-	\label{img:Task2}
-\end{figure}
+\subsubsection{Bombs \tiny Sven Zelch}
+Because our agent often killed himself we punished it highly when he moved to a bomb.
+MOVED\_TO\_BOMB punishes the agent when it walks into bomb explosion range and MOVED\_AWAY\_FROM\_BOMB rewards it if it moves out of the range.
+Additionally we punished the agent when it is in a position, where the bomb explosion would kill it and rewarded it when it is in a position where the bomb does not kill him.
+We also saw the the agent often was waiting in bomb range.
+Therefore we added MEANINGFUL\_WAIT and NOT\_MEANINGFUL\_WAIT which rewards it if it waits in a save spot and punishes it if it waits in bomb explosion range.
+Also the agent placed a lot of unnecessary bombs.
+That is why we added MEANINGFUL\_BOMB\_DROP and NOT\_MEANINGFUL\_BOMB\_DROP, which rewards the agent if the bomb placed would destroy a crate and punishes it otherwise.
 
 
-blabla Figure \ref{img:Task2-2}
+\subsubsection{Life \tiny Sven Zelch}
+Obviously getting killed is bad for the agents score, because it can not increase it anymore while other agents can.
+We added a hard punishment for suicides e.KILLED\_SELF and getting killed e.GOT\_KILLED.
+On the other hand killing a opponent is great for winning a game so we rewarded e.KILLED\_OPPONENT highly.
+Over the course of designing rewards we really liked opposite rewards that is why we also added NOT\_KILLED\_SELF and e.SURVIVED\_ROUND but in this case they don seem to be good, because more specific rewards are better, e.g. MOVED\_AWAY\_FROM\_BOMB for moving out of bomb range, and they have barley any impact.
 
 \subsubsection{Discussion}
 The agent showed some promising results in specific circumstances. The following points discuss
@@ -362,6 +428,133 @@ The longer training time resulted into more Q values closer to convergence. Neve
 we observe good behavior in both scenarios, such as a low number of invalid actions and more bombs placing in
 the scenario with crates and opponents.
 
+
+\subsection{Task 1 \tiny Sven Zelch}
+
+In Task 1 an agent is supposed to collect all the coins in the coin-heaven scenario, where no other agents and no crates exists.
+
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.6]{Figures/Task1.png}
+	\caption{Performance comparison Terminator and coin\_collector\_agent in coin-heaven scenario.}
+	\label{img:Task1}
+\end{figure}
+
+Figure \ref{img:Task1} compares the performance of our agent with the coin\_collector\_agent for Task 1.
+The coin\_collector\_agent shows an ideal scenario of how our agent should behave he reaches a score of 50 in all 100 games played, which means he always collects all 50 coins in the coin-heaven scenario, because it is the only way he can increase his score and each collected coin increases its score by one. 
+Our agent struggles to collect the coins within the given time of 400 steps.
+In fact he only collects 1 coin every 10 games.
+Watching the game with GUI on we can see the agent is waiting a lot.
+This issue occurred before where the time it takes for the agent to chose an action was greater than 0.5 seconds and the agent was forced by the game to wait.
+We are unsure what causes this issue this time around.
+%It could be caused by a lot of invalid actions as Task 2 suggests.
+
+\subsection{Task 2 \tiny Sven Zelch}
+
+Task 2 is similar to Task 1, but this time some coins are hidden under crates. The crates need to be blown up first before the agent can collects the coins. We used the classic scenario without other agents for this task.
+
+\begin{figure}[H]
+
+	\begin{subfigure}{\textwidth}
+		\centering
+		\includegraphics[scale=0.6]{Figures/Task2-1.png}
+		\caption{Performance comparison Terminator and coin\_collector\_agent moves}
+		\label{img:Task2-1}
+	\end{subfigure}
+
+
+	\begin{subfigure}{\textwidth}
+		\centering
+		\includegraphics[scale=0.6]{Figures/Task2-2.png}
+		\caption{Performance comparison Terminator and coin\_collector\_agent game}
+		\label{img:Task2-2}
+	\end{subfigure}
+
+	\caption{Performance comparison Terminator and coin\_collector\_agent in classic scenario without opponents}
+	\label{img:Task2}
+	
+\end{figure}
+
+Figure \ref{img:Task2-1} and \ref{img:Task2-2} compare the performance of our agent with the coin\_collector\_agent for Task 2.
+Again the coin\_collector\_agent performs way better than the Terminator, especially score wise. 
+Also it does about two times more moves than our agent and if we only count valid moves:
+$(359.2- 1.75) / (176.81 - 163.41) \approx 27$
+times more valid moves.
+The issue in Task 1 could also be caused by a lot of invalid actions, which look like the agent is waiting actions from the GUI perspective.
+As well as the limited amount of bombs Terminator drops is caused by the limited small amount of valid actions, about 13 per round, it takes.
+A good thing about our agent is that he only suicides 8 times in 100 games which is worse than the coin\_collector\_agent, but still a great result nevertheless.
+Both agents seem to struggle to find all the coins in 400 steps. 
+Terminator has a lower step count, because he suicides himself sometimes.
+Something really interesting here is that both agents take approximately the same time to chose an action.
+Particularly comparing the result from Terminator with them from Figure \ref{img:Task1} a high reduce in time to chose an action can be seen.
+This is probably caused by the agent being mostly trained in the classic scenario.
+
+\subsection{Task 3 \tiny Sven Zelch}
+
+In this Task the agent should additionally to collecting coins also try to hunt and blow up an opposite agent.
+
+\begin{figure}[H]
+
+\begin{subfigure}{\textwidth}
+	\centering
+	\includegraphics[scale=0.6]{Figures/Task3-1.png}
+	\caption{Performance comparison Terminator against peaceful\_agent and Terminator against coin\_collector\_agent moves}
+	\label{img:Task3-1}
+\end{subfigure}
+
+\begin{subfigure}{\textwidth}
+	\centering
+	\includegraphics[scale=0.6]{Figures/Task3-2.png}
+	\caption{Performance comparison Terminator against peaceful\_agent and Terminator against coin\_collector\_agent game}
+	\label{img:Task3-2}
+\end{subfigure}
+
+\caption{Performance comparison Terminator against peaceful\_agent and Terminator against coin\_collector\_agent}
+\label{img:Task3}
+
+\end{figure}
+
+Figure \ref{img:Task3-1} and \ref{img:Task3-2} compare the performance of our agent Terminator against the peaceful\_agent, who does not drop bombs and against the coin\_collector\_agent who only drops bombs to destroy crates.
+The peaceful\_agent seems to have barley any influence on the agent, because results of the match against the peaceful against are similar to the results of Figure \ref{img:Task2-1} and \ref{img:Task2-2}.
+Interestingly however is that the coin\_collector\_agent has a drastic effect on Terminators performance.
+The suicide rate is 11 times higher, even tough he drops the same amount of bombs.
+As a result of that he performs less moves, but about half his actions are valid actions compared to a fifth.
+Regardless of less rounds played the score is a bit better, but that is probably caused by small sample size.
+In both cases Terminator failed to kill his opponent.
+
+\subsection{Task 4 \tiny Sven Zelch}
+
+The agent competes against one ore more agents for the highest score in a classic Bomberman game.
+
+\begin{figure}[H]
+
+\begin{subfigure}{\textwidth}
+	\centering
+	\includegraphics[scale=0.6]{Figures/Task4-1.png}
+	\caption{Performance comparison Terminator against one rule\_based\_agent and three against rule\_based\_agents moves}
+	\label{img:Task4-1}
+\end{subfigure}
+
+\begin{subfigure}{\textwidth}
+	\centering
+	\includegraphics[scale=0.6]{Figures/Task4-2.png}
+	\caption{Performance comparison Terminator against one rule\_based\_agent and three against rule\_based\_agents game}
+	\label{img:Task4-2}
+\end{subfigure}
+
+\caption{Performance comparison Terminator against one rule\_based\_agent and three against rule\_based\_agents}
+\label{img:Task4}
+
+\end{figure}
+
+Figure \ref{img:Task3-1} and \ref{img:Task3-2} compare the performance of Terminator against one rule\_based\_agent and against three rule\_based\_agent.
+The rule\_based\_agent not only tries to collect coins but also to kill other opponents.
+Terminator has a hard time surviving against the rule\_based\_agent.
+With three rule\_based\_agent in the game he dies significantly faster than with only one.
+Interestingly the score is the same in both cases.
+This might be caused by the agent collecting a coin before an other agent can even kill him.
+Other than that he still did not manage to kill an opponent.
 
 %----------------------------------------------------------------------------------------
 %	CONCLUSION
