@@ -1,19 +1,4 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% University/School Laboratory Report
-% LaTeX Template
-% Version 4.0 (March 21, 2022)
-%
-% This template originates from:
-% https://www.LaTeXTemplates.com
-%
-% Authors:
-% Vel (vel@latextemplates.com)
-% Linux and Unix Users Group at Virginia Tech Wiki
-%
-% License:
-% CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/)
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 %----------------------------------------------------------------------------------------
 %	PACKAGES AND DOCUMENT CONFIGURATIONS
@@ -21,7 +6,7 @@
 
 \documentclass[
 	letterpaper, % Paper size, specify a4paper (A4) or letterpaper (US letter)
-	10pt, % Default font size, specify 10pt, 11pt or 12pt
+	12pt, % Default font size, specify 10pt, 11pt or 12pt
 ]{CSUniSchoolLabReport}
 
 \addbibresource{references.bib} % Bibliography file (located in the same folder as the template)
@@ -70,13 +55,25 @@
 
 \section{Introduction}
 
+\subsection{Reinforcement Learning}
+
+\subsection{Q-Learning \AB}
+Q-Learning ist a model-free reinforcement learning.
+Q-Learning is an (off-policy) algorithm based on temporal difference.
+The following equation
+defines the update after the transition to a new state:
+
+Q is a learned action-value function, that approximates the
+optimal policy.
+
+\[Q(s,a) = Q(s,a) + \alpha[r + \gamma \max_{a'} Q(s', a') - Q(s,a)] \]
+
 %----------------------------------------------------------------------------------------
 %	METHODS
 %----------------------------------------------------------------------------------------
 
 \section{Methods}
 
-\subsection{Q-Learning}
 \subsection{Reward Shaping}
 
 %----------------------------------------------------------------------------------------
@@ -87,6 +84,9 @@
 \subsection{Q-Learning}
 
 \subsubsection*{Q Table}
+
+ok \cite{DynRewardShaping}
+
 A major challenge to implement Q-Learning was the creation of a feature space.
 We initialize the Q table as a dictionary, whose keys are the features and the values are the values of the Q function for the six
 actions.
@@ -99,36 +99,54 @@ Additionally, we didn't feel the need to create a Q table covering every possibl
 feature space as for unseen states, we picked actions from a similar seen state.
 
 \subsubsection*{Feature space}
-Our features consist of ten values. The majority of the values contain the Manhattan distance between
-the agent and the nearest object of interest. For instance, Figure \ref{fig:example} illustrates a possible feature.
+The agent receives the state as a feature consisting of ten values. Figure \ref{fig:feature} shows
+the structure of a feature. The feature contains data about the nearest coin, the environment around
+the agent, the nearest crate or opponent and finally the nearest bomb.
+Specifically, the data to the nearest coin, crate or opponent and the bomb is the Manhattan distance
+between the agent and the object.
+
+At the 6th and 7th element, we chose to show the distance to either the crate or the opponent because
+the desired behavior is the same. For both objects the agent should move next to the object to
+place a bomb and then move away from the bomb.
+
+The environment shows which cells around the agent are free. A free cell
+
+Figure \ref{fig:example} illustrates a possible feature.
 The feature shows that the agent is only one cell away from a coin in the x-axis as the first value equals to one.
 The y value equals to 0, which means that the agent is in the same row as the coin.
 
 
+
+
+
 \begin{center}
 	\begin{figure}[H]
-		\scalebox{0.7}{
-			\begin{tabular}{ccccccccccc}
-				          &                                                        &         &       &        &                                                         & \multicolumn{2}{c}{\includegraphics[width=1cm]{Figures/robot_pink.png}} &                              \\
-				          & \multicolumn{2}{c}{\includegraphics{Figures/coin.png}} &         &       &        & \multicolumn{2}{c}{\includegraphics{Figures/crate.png}} & \multicolumn{2}{c}{\includegraphics{Figures/bomb_blue.png}}                                            \\
-				\\
-				feature = & (coin x,                                               & coin y, & left, & right, & down,  up,                                              & crate x ,                                                               & crate y, & bomb x, & bomb y)
-			\end{tabular}}
-		\caption{Illustration of the feature structure encoding the space of the agent}
+		\begin{subfigure}{\textwidth}
+			\scalebox{0.7}{
+				\begin{tabularx}{\textwidth}{cnneeeeoobb}
+					          &                                                        &                                                               &                                                         &                                                             &       &     & \multicolumn{2}{o}{\includegraphics[width=1cm]{Figures/robot_pink.png}} &          &                   \\
+					          & \multicolumn{2}{n}{\includegraphics{Figures/coin.png}} & \multicolumn{4}{e}{\includegraphics{Figures/environment.png}} & \multicolumn{2}{o}{\includegraphics{Figures/crate.png}} & \multicolumn{2}{b}{\includegraphics{Figures/bomb_blue.png}}                                                                                                                        \\
+					feature = & (coin x,                                               & coin y,                                                       & left,                                                   & right,                                                      & down, & up, & crate x ,                                                               & crate y, & bomb x, & bomb y)
+				\end{tabularx}}
+			\caption{Illustration of the feature structure encoding the state}
+			\label{fig:feature}
+		\end{subfigure}
+
+		\vspace{10mm}
+
+		\begin{subfigure}{\textwidth}
+			\centering
+			\begin{tabular}{cnneeeeoobb}
+				feature = & (1, & 0, & 0, & 0, & 1, & 1, & 5, & 1, & 9, & 12)
+			\end{tabular}
+			\caption{Example of a feature }
+			\label{fig:example}
+		\end{subfigure}
+
+		\caption{State as a feature}
 	\end{figure}
 \end{center}
 
-
-\begin{center}
-	\begin{figure}[h]
-		\centering
-		\begin{tabular}{ccccccccccc}
-			feature = & (1, & 0, & 0, & 0, & 1, & 1, & 5, & 1, & 9, & 12)
-		\end{tabular}
-		\caption{Example of a feature }
-		\label{fig:example}
-	\end{figure}
-\end{center}
 
 
 
@@ -187,6 +205,30 @@ only be earned when a crate or an opponent is present in the features, thus its 
 \end{table}
 
 
+
+\begin{figure}
+
+	\begin{subfigure}{\textwidth}
+		%\centering
+		\includegraphics[scale=0.6]{Figures/Task2-1.png}
+		\caption{Performance comparison Terminator and coin\_collector\_agent in classic scenario without opponents}
+		\label{img:Task2-1}
+	\end{subfigure}
+
+
+	\begin{subfigure}{\textwidth}
+		%\centering
+		\includegraphics[scale=0.6]{Figures/Task2-2.png}
+		\caption{Performance comparison Terminator and coin\_collector\_agent in classic scenario without opponents}
+		\label{img:Task2-2}
+	\end{subfigure}
+
+	\caption{Performance comparison Terminator and coin\_collector\_agent in classic scenario without opponents}
+	\label{img:Task2}
+\end{figure}
+
+
+blabla Figure \ref{img:Task2-2}
 
 \subsubsection{Discussion}
 The agent showed some promising results in specific circumstances. The following points discuss
@@ -329,6 +371,7 @@ the scenario with crates and opponents.
 
 
 \subsection*{Q-Learning}
+
 
 %----------------------------------------------------------------------------------------
 %	BIBLIOGRAPHY
